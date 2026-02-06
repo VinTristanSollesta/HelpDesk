@@ -4,7 +4,7 @@
 $host = getenv('DB_HOST') ?: 'localhost';
 $db   = getenv('DB_NAME') ?: 'adieduph_helpdesk';
 $user = getenv('DB_USER') ?: 'adieduph_adi25';
-$pass = getenv('DB_PASS') ?: '@Adismcs-2025!';
+$pass = getenv('DB_PASS') ?: '@Adismcs-2026!';
 $charset = 'utf8mb4';
 
 $dsn = "mysql:host=$host;dbname=$db;charset=$charset";

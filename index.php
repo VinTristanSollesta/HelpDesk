@@ -6,6 +6,7 @@ try {
 	$stmt = $pdo->query('SELECT NOW() AS now');
 	$row = $stmt->fetch();
 	echo 'Connected. Server time: ' . htmlspecialchars($row['now']);
+	header('Location: dashboard.php');
 } catch (Exception $e) {
 	echo 'Connection error: ' . htmlspecialchars($e->getMessage());
 }

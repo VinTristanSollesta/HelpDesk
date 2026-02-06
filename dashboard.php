@@ -9,20 +9,7 @@
 </head>
 <body class="bg-gray-100 text-gray-800">
     <div class="min-h-screen">
-        <nav class="bg-white shadow">
-            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                <div class="flex justify-between h-16">
-                    <div class="flex items-center">
-                        <a href="index.php" class="text-xl font-semibold text-indigo-600">Ateneo HelpDesk</a>
-                    </div>
-                    <div class="flex items-center space-x-4">
-                        <a href="dashboard.php" class="text-sm font-medium text-gray-700">Dashboard</a>
-                        <a href="#" class="text-sm font-medium text-gray-700">Tickets</a>
-                        <a href="#" class="text-sm font-medium text-gray-700">Reports</a>
-                    </div>
-                </div>
-            </div>
-        </nav>
+        <?php require_once __DIR__ . '/includes/header.php'; ?>
 
         <header class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
             <h1 class="text-3xl font-bold">Dashboard</h1>
@@ -48,7 +35,7 @@
             <section class="bg-white p-6 rounded-lg shadow-sm">
                 <div class="flex items-center justify-between mb-4">
                     <h2 class="text-lg font-medium">Recent Tickets</h2>
-                    <a href="#" class="text-sm text-indigo-600">View all</a>
+                    <a href="#" class="text-sm text-indigo-600">Search</a>
                 </div>
                 <div class="overflow-x-auto">
                     <table class="min-w-full divide-y divide-gray-200">
@@ -76,26 +63,8 @@
         </main>
 
         <footer class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 text-sm text-gray-500">
-            © 2026 Ateneo de Iloilo — HelpDesk
+            © 2026 Ateneo de Iloilo — HelpDesk maintained by <a href="https://www.github.com/VinTristanSollesta" class="text-indigo-600 hover:underline">vtgsollesta</a>
         </footer>
-    </div>
-</body>
-</html>
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ateneo de Iloilo HelpDesk</title>
-    <style>
-        @import "styles.css";
-    </style>
-</head>
-<body>
-    <div class="container">
-        <h1>Welcome to Ateneo de Iloilo HelpDesk</h1>
-        <p>This is the dashboard page. You can manage your tickets and view reports here.</p>
-        
     </div>
 </body>
 </html>

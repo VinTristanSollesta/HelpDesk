@@ -56,7 +56,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     // Optional: remove CSRF token
                     unset($_SESSION['csrf_token']);
 
-                    header('Location: dashboard.php');
+                    // Redirect to originally requested page if present
+                    $redirect = $_SESSION['return_to'] ?? 'dashboard.php';
+                    unset($_SESSION['return_to']);
+                    header('Location: ' . $redirect);
                     exit;
                 } else {
                     $error = 'Invalid credentials.';

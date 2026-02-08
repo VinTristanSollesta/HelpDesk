@@ -1,14 +1,13 @@
 <?php
-require_once __DIR__ . '/dbConnect.php';
+// Default routing: public users -> new-ticket.php, logged-in agents -> dashboard.php
+if (session_status() !== PHP_SESSION_ACTIVE) session_start();
 
-try {
-	$pdo = getPDO();
-	$stmt = $pdo->query('SELECT NOW() AS now');
-	$row = $stmt->fetch();
-	echo 'Connected. Server time: ' . htmlspecialchars($row['now']);
+// If an agent is logged in, send them to the dashboard; otherwise show the public new-ticket form
+if (!empty($_SESSION['agent_id'])) {
 	header('Location: dashboard.php');
-} catch (Exception $e) {
-	echo 'Connection error: ' . htmlspecialchars($e->getMessage());
+	exit;
 }
 
+include('new-ticket.php');
+exit;
 ?>

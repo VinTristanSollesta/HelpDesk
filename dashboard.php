@@ -1,3 +1,4 @@
+<?php require_once __DIR__ . '/includes/auth.php'; require_agent(); ?>
 <!DOCTYPE html>
 <html lang="en">
 <head>

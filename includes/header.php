@@ -18,8 +18,8 @@ function navClass($page, $current) {
         <a href="index.php" class="text-xl font-semibold text-indigo-600">Ateneo HelpDesk</a>
       </div>
       <div class="flex items-center space-x-4">
-        <a href="dashboard.php" class="<?php echo navClass('dashboard.php', $current); ?>">Dashboard</a>
-        <?php if (!empty($_SESSION['agent_id'])): ?>
+          <?php if (!empty($_SESSION['agent_id'])): ?>
+            <a href="dashboard.php" class="<?php echo navClass('dashboard.php', $current); ?>">Dashboard</a>
             <a href="tickets-page.php" class="<?php echo navClass('tickets-page.php', $current); ?>">Tickets</a>
             <a href="resolved-page.php" class="<?php echo navClass('resolved-page.php', $current); ?>">Resolved</a>
             <span class="text-sm text-gray-500">|</span>

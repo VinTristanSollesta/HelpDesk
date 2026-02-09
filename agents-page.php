@@ -179,6 +179,7 @@ if (isset($_GET['edit'])) {
                     </div>
                 </form>
             </div>
+
         </div>
 
         <!-- Agents List -->
@@ -215,6 +216,9 @@ if (isset($_GET['edit'])) {
             </table>
             </div>
         </div>
+        <footer class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 text-sm text-gray-500">
+            © 2026 Ateneo de Iloilo — HelpDesk maintained by <a href="https://www.github.com/VinTristanSollesta" class="text-indigo-600 hover:underline">vtgsollesta</a>
+        </footer>
     </div>
     <script>
         // Modal open/close logic for Add

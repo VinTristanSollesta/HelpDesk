@@ -107,7 +107,7 @@ if ($currentTicket) {
 // Try to load attachments if table exists
 $attachments = [];
 try {
-    $ast = $pdo->prepare('SELECT id, filename, uploaded_at FROM Attachments WHERE ticket_ID = :t ORDER BY uploaded_at DESC');
+    $ast = $pdo->prepare('SELECT attachment_ID, file_name, uploaded_at FROM Attachments WHERE ticket_ID = :t ORDER BY uploaded_at DESC');
     if (!empty($currentTicket)) {
         $ast->execute([':t' => (int)$currentTicket['ticket_ID']]);
         $attachments = $ast->fetchAll(PDO::FETCH_ASSOC);
@@ -275,9 +275,9 @@ function h($s){ return htmlspecialchars($s ?? '', ENT_QUOTES, 'UTF-8'); }
           <?php else: ?>
             <div class="grid grid-cols-1 gap-3 text-sm">
               <?php foreach ($attachments as $a): 
-                    $ext = strtolower(pathinfo($a['filename'], PATHINFO_EXTENSION));
+                    $ext = strtolower(pathinfo($a['file_name'], PATHINFO_EXTENSION));
                     $isImage = in_array($ext, ['jpg','jpeg','png','gif','webp'], true);
-                    $url = 'uploads/' . $a['filename'];
+                    $url = 'uploads/' . $a['file_name'];
               ?>
                 <div class="flex items-center space-x-3">
                   <?php if ($isImage): ?>
@@ -285,11 +285,11 @@ function h($s){ return htmlspecialchars($s ?? '', ENT_QUOTES, 'UTF-8'); }
                       <img src="<?php echo h($url); ?>" alt="attachment" class="w-20 h-16 object-cover rounded border" />
                     </a>
                     <div class="flex-1">
-                      <div class="text-sm text-gray-700 break-all"><?php echo h($a['filename']); ?></div>
+                      <div class="text-sm text-gray-700 break-all"><?php echo h($a['file_name']); ?></div>
                       <div class="text-xs text-gray-400"><?php echo h($a['uploaded_at']); ?></div>
                     </div>
                   <?php else: ?>
-                    <a class="text-indigo-600 break-all" href="<?php echo h($url); ?>" target="_blank"><?php echo h($a['filename']); ?></a>
+                    <a class="text-indigo-600 break-all" href="<?php echo h($url); ?>" target="_blank"><?php echo h($a['file_name']); ?></a>
                     <div class="text-xs text-gray-400"><?php echo h($a['uploaded_at']); ?></div>
                   <?php endif; ?>
                 </div>

@@ -105,9 +105,9 @@
                         <div class="text-sm text-gray-500">Range</div>
                         <div class="mt-2">
                             <select id="rangeSelect" class="mt-1 block w-full border border-gray-300 rounded-md p-2 text-sm">
-                                <option value="7">Last 7 days</option>
+                                <option value="7" selected>Last 7 days</option>
                                 <option value="14">Last 14 days</option>
-                                <option value="30" selected>Last 30 days</option>
+                                <option value="30" >Last 30 days</option>
                             </select>
                         </div>
                     </div>
@@ -127,7 +127,7 @@
                         const dataRes = <?php echo json_encode($dataRes); ?>;
 
                         const ctx = document.getElementById('ticketsChart').getContext('2d');
-                        let currentRange = 30;
+                        let currentRange = 7;
 
                         const cfg = {
                             type: 'bar',

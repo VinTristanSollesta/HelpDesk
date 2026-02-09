@@ -133,5 +133,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       <p class="mt-6 text-center text-sm text-gray-600">Not an agent? <a href="index.php" class="text-indigo-600 hover:text-indigo-500">Return to site</a></p>
     </div>
   </div>
+  <footer class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 text-sm text-gray-500">
+      © 2026 Ateneo de Iloilo — HelpDesk maintained by <a href="https://www.github.com/VinTristanSollesta" class="text-indigo-600 hover:underline">vtgsollesta</a>
+  </footer>
 </body>
 </html>

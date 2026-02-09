@@ -21,6 +21,33 @@ if (!$publicToken) {
 
 $pdo = getPDO();
 
+
+if (
+    $_SERVER['REQUEST_METHOD'] === 'POST'
+    && isset($_POST['assign_ticket_id'], $_POST['assign_agent_id'])
+) {
+    if (session_status() !== PHP_SESSION_ACTIVE) session_start();
+
+    if (!empty($_SESSION['agent_id']) && (int)($_SESSION['access_level'] ?? 0) === 1) {
+        $assignTicketId = (int)($_POST['assign_ticket_id'] ?? 0);
+        $assignAgentId  = trim((string)($_POST['assign_agent_id'] ?? ''));
+
+        if ($assignTicketId > 0 && $assignAgentId !== '') {
+            $assignAgentIdInt = (int)$assignAgentId;
+
+            $stmt = $pdo->prepare('UPDATE Tickets SET agent_id = :agent_id, status_id = 2 WHERE ticket_ID = :ticket_id');
+            $stmt->execute([
+                ':agent_id'  => $assignAgentIdInt,
+                ':ticket_id' => $assignTicketId,
+            ]);
+        }
+
+        // Redirect back to the same ticket view
+        header('Location: ticket-conversation.php?ticket_id=' . $assignTicketId);
+        exit;
+    }
+}
+
 // Handle posting a reply (agents only)
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($_POST['message'])) {
     if (session_status() !== PHP_SESSION_ACTIVE) session_start();
@@ -163,7 +190,22 @@ function h($s){ return htmlspecialchars($s ?? '', ENT_QUOTES, 'UTF-8'); }
                 <?php if (($currentTicket['status_id'] ?? null) == 3): ?>
                   <span class="inline-flex items-center px-2 py-1 text-xs font-semibold rounded bg-green-100 text-green-800 ml-2">Resolved</span>
                 <?php endif; ?>
-              </div>
+                <?php if (!empty($_SESSION['agent_id']) && (int)($_SESSION['access_level'] ?? 0) === 1 && $currentTicket && (($currentTicket['status_id'] ?? null) != 3)): ?>
+                  <form method="post" class="ml-4 flex items-center">
+                    <input type="hidden" name="assign_ticket_id" value="<?php echo h($currentTicket['ticket_ID']); ?>">
+                    <label for="assign_agent_id" class="text-xs text-gray-700 mr-2">Assign to:</label>
+                    <select name="assign_agent_id" id="assign_agent_id" class="border rounded px-2 py-1 text-xs">
+                      <option value="">Select agent...</option>
+                      <?php
+                      $agentsList = $pdo->query('SELECT agent_id, name FROM Agents ORDER BY name ASC')->fetchAll(PDO::FETCH_ASSOC);
+                      foreach ($agentsList as $ag): ?>
+                        <option value="<?php echo $ag['agent_id']; ?>" <?php echo ($currentTicket['agent_id'] == $ag['agent_id']) ? 'selected' : ''; ?>><?php echo htmlspecialchars($ag['name']); ?></option>
+                      <?php endforeach; ?>
+                    </select>
+                    <button type="submit" class="ml-2 bg-indigo-600 text-white px-2 py-1 rounded text-xs">Assign</button>
+                  </form>
+                <?php endif; ?>
+            </div>
               <div class="text-xs text-gray-500">Ticket #<?php echo h($currentTicket['ticket_ID']); ?> — Created: <?php echo h($currentTicket['created_at'] ?? ''); ?></div>
               <?php if (($currentTicket['status_id'] ?? null) == 3): ?>
                 <?php
@@ -188,17 +230,6 @@ function h($s){ return htmlspecialchars($s ?? '', ENT_QUOTES, 'UTF-8'); }
                     Resolved by agent
                   <?php endif; ?>
                 </div>
-              <?php endif; ?>
-
-              <?php if (!empty($_SESSION['agent_id']) && (($currentTicket['status_id'] ?? null) != 3)): ?>
-              <div class="mt-2 mb-3">
-                <form method="post" class="flex items-start space-x-2">
-                  <input type="hidden" name="ticket_id" value="<?php echo h($currentTicket['ticket_ID']); ?>">
-                  <input type="hidden" name="action" value="resolve">
-                  <textarea name="resolution_note" rows="2" placeholder="Optional resolution note" class="flex-1 border border-gray-300 rounded p-2 text-sm" ></textarea>
-                  <button type="submit" class="ml-2 inline-flex items-center px-3 py-2 bg-green-600 text-white rounded hover:bg-green-700 text-sm">Resolve</button>
-                </form>
-              </div>
               <?php endif; ?>
 
             </header>
@@ -252,17 +283,18 @@ function h($s){ return htmlspecialchars($s ?? '', ENT_QUOTES, 'UTF-8'); }
               ?>
             </div>
 
-            <?php if (!empty($_SESSION['agent_id'])): ?>
-            <form method="post" class="mt-2">
-              <input type="hidden" name="ticket_id" value="<?php echo h($currentTicket['ticket_ID']); ?>">
-              <div>
-                <textarea name="message" rows="3" class="w-full border border-gray-300 rounded p-2" placeholder="Write a reply..."></textarea>
-              </div>
-              <div class="mt-2 text-right">
-                <button type="submit" class="inline-flex items-center px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700">Send</button>
-              </div>
-            </form>
-            <?php endif; ?>
+            <?php if (!empty($_SESSION['agent_id']) && (($currentTicket['status_id'] ?? null) != 3)): ?>
+              <form method="post" class="mt-2 flex items-end">
+                <input type="hidden" name="ticket_id" value="<?php echo h($currentTicket['ticket_ID']); ?>">
+                <div class="flex-1">
+                  <textarea name="message" rows="3" class="w-full border border-gray-300 rounded p-2" placeholder="Write a reply or resolution note..."></textarea>
+                </div>
+                <div class="ml-2 flex flex-col gap-2">
+                  <button type="submit" class="inline-flex items-center justify-center px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700">Send</button>
+                  <button type="submit" name="action" value="resolve" class="inline-flex items-center px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700">Resolve</button>
+                </div>
+              </form>
+              <?php endif; ?>
 
           <?php endif; ?>
         </section>

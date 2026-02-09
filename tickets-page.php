@@ -77,12 +77,12 @@
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Agent</th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Updated</th>
-                        </tr>
+                            </tr>
                     </thead>
                     <tbody class="bg-white divide-y divide-gray-200">
                         <?php if (empty($tickets)): ?>
                             <tr>
-                                <td class="px-6 py-4 text-sm text-gray-500" colspan="6">No tickets found.</td>
+                                <td class="px-6 py-4 text-sm text-gray-500" colspan="7">No tickets found.</td>
                             </tr>
                         <?php else: ?>
                             <?php foreach ($tickets as $ticket): ?>

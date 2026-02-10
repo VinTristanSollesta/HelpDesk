@@ -71,7 +71,6 @@
                 <table class="min-w-full divide-y divide-gray-200">
                     <thead class="bg-gray-50">
                         <tr>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">#</th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Subject</th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Client</th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Agent</th>
@@ -111,7 +110,6 @@
                                     }
                                 ?>
                                 <tr role="link" tabindex="0" onclick="window.location.href='<?php echo $rowUrl; ?>'" onkeypress="if(event.key==='Enter'){window.location.href='<?php echo $rowUrl; ?>'}" class="hover:bg-gray-50 cursor-pointer">
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700"><?php echo htmlspecialchars($ticket['ticket_ID']); ?></td>
                                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900"><?php echo htmlspecialchars($ticket['subject']); ?></td>
                                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700"><?php echo htmlspecialchars($ticket['client_name'] ?? '—'); ?></td>
                                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700"><?php echo htmlspecialchars($ticket['agent_name'] ?? '—'); ?></td>

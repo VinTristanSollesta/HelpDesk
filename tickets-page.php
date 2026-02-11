@@ -17,55 +17,76 @@
 
 		<header class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
 			<h1 class="text-3xl font-bold">Tickets</h1>
-			<p class="mt-2 text-sm text-gray-600">List and manage support tickets.</p>
             <button onclick="window.location.href='new-ticket.php'" class="mt-4 inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-500 hover:bg-blue-700">New Ticket</button>
 		</header>
 
 		<main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <section class="bg-white p-6 rounded-lg shadow-sm">
-                <!-- Search form (GET) -->
-                <form method="get" action="" class="mb-4">
-                    <div class="max-w-md flex items-center">
-                        <input name="q" type="search" placeholder="Search by subject, client, or agent" value="<?php echo htmlspecialchars($_GET['q'] ?? ''); ?>" class="w-full px-3 py-2 border border-gray-300 rounded-l-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500" />
-                        <button type="submit" class="inline-flex items-center px-4 py-2 bg-indigo-600 text-white rounded-r-md hover:bg-indigo-700">Search</button>
-                        <?php if (!empty($_GET['q'])): ?>
-                            <a href="tickets-page.php" class="ml-2 text-sm text-gray-600">Clear</a>
-                        <?php endif; ?>
-                    </div>
-                </form>
-
                 <?php
                 require_once __DIR__ . '/dbConnect.php';
                 $pdo = getPDO();
 
                 $q = trim((string)($_GET['q'] ?? ''));
+                $statusFilter = isset($_GET['status']) ? (int)$_GET['status'] : null;
+                $page = isset($_GET['page']) ? max(1, (int)$_GET['page']) : 1;
+                $perPage = 15;
+                $offset = ($page - 1) * $perPage;
 
+                // Load all statuses for filter
+                $statuses = $pdo->query('SELECT status_id, label FROM Status ORDER BY status_id ASC')->fetchAll(PDO::FETCH_ASSOC);
+
+                // Build base SQL and count
+                $baseSql = "FROM Tickets t
+                    LEFT JOIN Clients c ON t.client_ID = c.client_ID
+                    LEFT JOIN Agents a ON t.agent_id = a.agent_id
+                    LEFT JOIN Status s ON t.status_id = s.status_id";
+                $where = [];
+                $params = [];
                 if ($q !== '') {
-                    $sql = "SELECT t.ticket_ID, t.public_token, t.subject, t.created_at, c.full_name AS client_name, a.name AS agent_name, s.label AS status_label, s.hexcolor AS status_hex
-                        FROM Tickets t
-                        LEFT JOIN Clients c ON t.client_ID = c.client_ID
-                        LEFT JOIN Agents a ON t.agent_id = a.agent_id
-                        LEFT JOIN Status s ON t.status_id = s.status_id
-                        WHERE (t.subject LIKE :q OR c.full_name LIKE :q OR a.name LIKE :q)
-                        ORDER BY t.created_at DESC
-                        LIMIT 200";
-
-                    $stmt = $pdo->prepare($sql);
-                    $stmt->execute([':q' => "%{$q}%"]);
-                } else {
-                    $sql = "SELECT t.ticket_ID, t.public_token, t.subject, t.created_at, c.full_name AS client_name, a.name AS agent_name, s.label AS status_label, s.hexcolor AS status_hex
-                        FROM Tickets t
-                        LEFT JOIN Clients c ON t.client_ID = c.client_ID
-                        LEFT JOIN Agents a ON t.agent_id = a.agent_id
-                        LEFT JOIN Status s ON t.status_id = s.status_id
-                        ORDER BY t.created_at DESC
-                        LIMIT 100";
-
-                    $stmt = $pdo->query($sql);
+                    $where[] = '(t.subject LIKE :q1 OR c.full_name LIKE :q2 OR a.name LIKE :q3)';
+                    $params[':q1'] = $params[':q2'] = $params[':q3'] = "%{$q}%";
                 }
+                if ($statusFilter !== null && $statusFilter > 0) {
+                    $where[] = 't.status_id = :status_id';
+                    $params[':status_id'] = $statusFilter;
+                }
+                $whereClause = $where ? ' WHERE ' . implode(' AND ', $where) : '';
 
-                $tickets = $stmt->fetchAll(PDO::FETCH_ASSOC);
+                $countSql = "SELECT COUNT(*) $baseSql $whereClause";
+                $countStmt = $pdo->prepare($countSql);
+                $countStmt->execute($params);
+                $total = (int)$countStmt->fetchColumn();
+                $totalPages = max(1, (int)ceil($total / $perPage));
+
+                $dataSql = "SELECT t.ticket_ID, t.public_token, t.subject, t.created_at, c.full_name AS client_name, a.name AS agent_name, s.label AS status_label, s.hexcolor AS status_hex
+                    $baseSql $whereClause ORDER BY t.created_at DESC LIMIT " . (int)$perPage . " OFFSET " . (int)$offset;
+                $dataStmt = $pdo->prepare($dataSql);
+                $dataStmt->execute($params);
+                $tickets = $dataStmt->fetchAll(PDO::FETCH_ASSOC);
+
+                $queryBase = [];
+                if ($q !== '') $queryBase['q'] = $q;
+                if ($statusFilter !== null && $statusFilter > 0) $queryBase['status'] = $statusFilter;
+                function buildQuery(array $base, $page = null) {
+                    $b = $base;
+                    if ($page !== null && $page > 1) $b['page'] = $page;
+                    return $b ? '?' . http_build_query($b) : '';
+                }
                 ?>
+                <!-- Search + Status filter (GET) -->
+                <form method="get" action="tickets-page.php" class="mb-4 flex flex-wrap items-center gap-3">
+                    <input name="q" type="search" placeholder="Search by subject, client, or agent" value="<?php echo htmlspecialchars($q); ?>" class="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500" />
+                    <select name="status" class="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
+                        <option value="">All statuses</option>
+                        <?php foreach ($statuses as $st): ?>
+                            <option value="<?php echo (int)$st['status_id']; ?>" <?php echo ($statusFilter === (int)$st['status_id']) ? 'selected' : ''; ?>><?php echo htmlspecialchars($st['label']); ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                    <button type="submit" class="inline-flex items-center px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700">Filter</button>
+                    <?php if ($q !== '' || ($statusFilter !== null && $statusFilter > 0)): ?>
+                        <a href="tickets-page.php" class="text-sm text-gray-600 hover:underline">Clear</a>
+                    <?php endif; ?>
+                </form>
 
                 <div class="overflow-x-auto">
                 <table class="min-w-full divide-y divide-gray-200">
@@ -125,6 +146,30 @@
                     </tbody>
                 </table>
                 </div>
+
+                <?php if ($totalPages > 1): ?>
+                <div class="mt-4 flex flex-wrap items-center justify-between gap-2">
+                    <div class="text-sm text-gray-500">
+                        Showing <?php echo $total ? $offset + 1 : 0; ?>–<?php echo min($offset + $perPage, $total); ?> of <?php echo $total; ?> tickets
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <?php if ($page > 1): ?>
+                            <a href="tickets-page.php<?php echo buildQuery($queryBase, $page - 1); ?>" class="px-3 py-1.5 bg-gray-200 rounded hover:bg-gray-300 text-sm">Previous</a>
+                        <?php endif; ?>
+                        <?php
+                        $range = 3;
+                        $start = max(1, $page - $range);
+                        $end = min($totalPages, $page + $range);
+                        for ($i = $start; $i <= $end; $i++):
+                        ?>
+                            <a href="tickets-page.php<?php echo buildQuery($queryBase, $i); ?>" class="px-3 py-1.5 rounded text-sm <?php echo $i === $page ? 'bg-indigo-600 text-white' : 'bg-gray-200 hover:bg-gray-300'; ?>"><?php echo $i; ?></a>
+                        <?php endfor; ?>
+                        <?php if ($page < $totalPages): ?>
+                            <a href="tickets-page.php<?php echo buildQuery($queryBase, $page + 1); ?>" class="px-3 py-1.5 bg-gray-200 rounded hover:bg-gray-300 text-sm">Next</a>
+                        <?php endif; ?>
+                    </div>
+                </div>
+                <?php endif; ?>
             </section>
 		</main>
 

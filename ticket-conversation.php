@@ -324,7 +324,7 @@ function h($s){ return htmlspecialchars($s ?? '', ENT_QUOTES, 'UTF-8'); }
 
             <?php
             $isAdmin = (int)($_SESSION['access_level'] ?? 0) === 1;
-            $isAssignedAgent = !empty($currentTicket['agent_id']) && (int)$currentTicket['agent_id'] === (int)$_SESSION['agent_id'];
+            $isAssignedAgent = !empty($currentTicket['agent_id'] ?? null) && (int)$currentTicket['agent_id'] === (int)$_SESSION['agent_id'];
             $canReplyOrResolve = !empty($_SESSION['agent_id']) && (($currentTicket['status_id'] ?? null) != 3) && ($isAdmin || $isAssignedAgent);
             ?>
             <?php if ($canReplyOrResolve): ?>

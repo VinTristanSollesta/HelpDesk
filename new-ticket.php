@@ -1,5 +1,4 @@
 <?php
-
 require_once __DIR__ . '/dbConnect.php';
 
 if (session_status() !== PHP_SESSION_ACTIVE) {
@@ -31,7 +30,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             try {
                 $pdo = getPDO();
 
-                // Check if client exists by email
+                // 1. Check/Insert Client
                 $stmt = $pdo->prepare('SELECT client_ID FROM Clients WHERE email = :email LIMIT 1');
                 $stmt->execute([':email' => $email]);
                 $client = $stmt->fetch();
@@ -39,80 +38,70 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 if ($client) {
                     $client_id = $client['client_ID'];
                 } else {
-                    // Insert new client
                     $ins = $pdo->prepare('INSERT INTO Clients (full_name, email, phone_number, department) VALUES (:full_name, :email, :phone, :dept)');
                     $ins->execute([':full_name' => $full_name, ':email' => $email, ':phone' => $phone, ':dept' => $department]);
                     $client_id = (int)$pdo->lastInsertId();
                 }
 
-                // Insert ticket
+                // 2. Insert Ticket
                 $public_token = bin2hex(random_bytes(16));
-                $agent_id = null;
-                if (!empty($_SESSION['agent_id'])) {
-                    $agent_id = (int)$_SESSION['agent_id'];
-                } else {
-                    
-                    try {
-                        $fb = $pdo->query('SELECT agent_id FROM Agents ORDER BY access_level DESC LIMIT 1')->fetchColumn();
-                        $agent_id = $fb !== false ? (int)$fb : 0;
-                    } catch (Exception $e) {
-                        
-                        $agent_id = 0;
-                    }
+                $agent_id = !empty($_SESSION['agent_id']) ? (int)$_SESSION['agent_id'] : 0;
+                
+                // Fallback for agent assignment if not logged in
+                if ($agent_id === 0) {
+                    $fb = $pdo->query('SELECT agent_id FROM Agents ORDER BY access_level DESC LIMIT 1')->fetchColumn();
+                    $agent_id = $fb !== false ? (int)$fb : 0;
                 }
-                $status_id = 1; 
-                $priority_id = 1; 
 
-                $t = $pdo->prepare('INSERT INTO Tickets (subject, description, client_ID, agent_id, status_id, priority_id, public_token) VALUES (:subject, :desc, :client, :agent, :status, :priority, :token)');
+                $t = $pdo->prepare('INSERT INTO Tickets (subject, description, client_ID, agent_id, status_id, priority_id, public_token) VALUES (:subject, :desc, :client, :agent, 1, 1, :token)');
                 $t->execute([
                     ':subject' => $subject,
                     ':desc' => $description,
                     ':client' => $client_id,
                     ':agent' => $agent_id,
-                    ':status' => $status_id,
-                    ':priority' => $priority_id,
                     ':token' => $public_token,
                 ]);
 
                 $ticket_id = (int)$pdo->lastInsertId();
 
-                // Send ticket copy to the client who created it
+                // 3. SEND EMAIL (Crucial Step)
+                // We do this BEFORE the redirect. The script will wait for SMTP response here.
                 require_once __DIR__ . '/includes/mail.php';
-                $baseUrl = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off' ? 'https' : 'http') . '://' . ($_SERVER['HTTP_HOST'] ?? 'localhost') . rtrim(dirname($_SERVER['PHP_SELF'] ?? ''), '/');
-                $publicLink = $baseUrl . '/ticket-conversation.php?public_token=' . urlencode($public_token);
-                sendTicketCopyToClient($email, $full_name, $subject, $description, $ticket_id, $publicLink);
+                $protocol = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off' ? 'https' : 'http');
+                $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
+                $dir = rtrim(dirname($_SERVER['PHP_SELF'] ?? ''), '/');
+                $publicLink = "$protocol://$host$dir/ticket-conversation.php?public_token=" . urlencode($public_token);
 
+                $mailSent = sendTicketCopyToClient($email, $full_name, $subject, $description, $ticket_id, $publicLink);
+
+                // 4. Handle Attachments
                 if (!empty($_FILES['attachments']) && is_array($_FILES['attachments']['name'])) {
                     $uploadDir = __DIR__ . '/uploads';
-                    if (!is_dir($uploadDir)) {
-                        @mkdir($uploadDir, 0755, true);
-                    }
+                    if (!is_dir($uploadDir)) @mkdir($uploadDir, 0755, true);
 
                     $allowedMax = 100 * 1024 * 1024; 
                     $finfo = new finfo(FILEINFO_MIME_TYPE);
                     $insAttach = $pdo->prepare('INSERT INTO Attachments (ticket_ID, file_name, uploaded_by, uploaded_at) VALUES (:ticket, :fname, :uploaded_by, NOW())');
 
                     foreach ($_FILES['attachments']['name'] as $i => $name) {
-                        $error = $_FILES['attachments']['error'][$i];
-                        if ($error !== UPLOAD_ERR_OK) continue;
+                        if ($_FILES['attachments']['error'][$i] !== UPLOAD_ERR_OK) continue;
                         $tmp = $_FILES['attachments']['tmp_name'][$i];
-                        $size = filesize($tmp);
-                        if ($size === false || $size > $allowedMax) continue;
+                        if (filesize($tmp) > $allowedMax) continue;
+                        
                         $mime = $finfo->file($tmp);
                         if (!in_array($mime, ['image/jpeg','image/png','image/gif','image/webp'], true)) continue;
 
                         $ext = pathinfo($name, PATHINFO_EXTENSION);
                         $safe = bin2hex(random_bytes(8)) . '_' . $ticket_id . '.' . ($ext ?: 'dat');
-                        $dest = $uploadDir . DIRECTORY_SEPARATOR . $safe;
-                        if (@move_uploaded_file($tmp, $dest)) {
-                            // store relative filename and record the client who uploaded
+                        if (@move_uploaded_file($tmp, $uploadDir . '/' . $safe)) {
                             $insAttach->execute([':ticket' => $ticket_id, ':fname' => $safe, ':uploaded_by' => $client_id]);
                         }
                     }
                 }
 
-                // Redirect to tickets page or show success
-                header('Location: tickets-page.php');
+                // 5. REDIRECT after everything is done
+                // We pass a success flag to show a message on the next page
+                header('Location: tickets-page.php?success=1' . (!$mailSent ? '&mail_error=1' : ''));
                 exit;
 
             } catch (Exception $e) {
@@ -129,7 +118,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>New Ticket — Ateneo HelpDesk</title>
     <link rel="stylesheet" href="dist/styles.css">
-    <meta name="robots" content="noindex">
 </head>
 <body class="bg-gray-100 text-gray-800">
     <div class="min-h-screen">
@@ -138,11 +126,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <main class="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
             <div class="bg-white p-6 rounded-lg shadow">
                 <h1 class="text-2xl font-bold mb-4">Create New Ticket</h1>
+                
                 <?php if ($error): ?>
-                    <div class="mb-4 text-sm text-red-700 bg-red-100 p-2 rounded"><?php echo htmlspecialchars($error); ?></div>
+                    <div class="mb-4 text-sm text-red-700 bg-red-100 p-3 rounded"><?php echo htmlspecialchars($error); ?></div>
                 <?php endif; ?>
 
-                <form method="post" action="" enctype="multipart/form-data" class="space-y-4">
+                <form id="ticketForm" method="post" action="" enctype="multipart/form-data" class="space-y-4">
                     <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($_SESSION['csrf_token'] ?? ''); ?>">
 
                     <div>
@@ -177,95 +166,77 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     </div>
 
                     <div>
-                        <label class="block text-sm font-medium text-gray-700">Attachments (images only, max 5MB each)</label>
-                        <div id="drop-area" class="mt-1 block w-full border-2 border-dashed border-gray-300 rounded-md p-4 justify-center text-center bg-gray-50 hover:bg-gray-100 hover:border-indigo-400 cursor-pointer min-h-[7rem]">
+                        <label class="block text-sm font-medium text-gray-700">Attachments (Images only)</label>
+                        <div id="drop-area" class="mt-1 block w-full border-2 border-dashed border-gray-300 rounded-md p-4 text-center bg-gray-50 hover:bg-gray-100 cursor-pointer">
                             <input id="attachments-input" name="attachments[]" type="file" accept="image/*" multiple class="hidden" />
-                            <div id="drop-text" class="text-sm text-gray-500">Drag & drop images here, or click to browse</div>
+                            <div class="text-sm text-gray-500">Click to upload or drag & drop images</div>
                             <div id="previews" class="mt-3 grid grid-cols-3 gap-2"></div>
                         </div>
                     </div>
 
                     <div class="flex items-center space-x-4">
-                        <button type="submit" class="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700">Create Ticket</button>
-                        <?php if (!empty($_SESSION['agent_id'])): ?>
-                            <a href="dashboard.php" class="text-sm text-gray-600">Cancel</a>
-                        <?php endif; ?>
+                        <button type="submit" id="submitBtn" class="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none">
+                            Create Ticket
+                        </button>
                     </div>
                 </form>
             </div>
         </main>
-        <footer class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 text-sm text-gray-500">
-            © 2026 Ateneo de Iloilo — HelpDesk maintained by <a href="https://www.github.com/VinTristanSollesta" class="text-indigo-600 hover:underline">vtgsollesta</a>
-        </footer>
     </div>
-                        <script>
-                        (function(){
-                            const dropArea = document.getElementById('drop-area');
-                            const input = document.getElementById('attachments-input');
-                            const previews = document.getElementById('previews');
 
-                            function prevent(e){ e.preventDefault(); e.stopPropagation(); }
-                            ['dragenter','dragover','dragleave','drop'].forEach(ev => dropArea.addEventListener(ev, prevent));
+    <script>
+        // 1. Loading State on Submit
+        const ticketForm = document.getElementById('ticketForm');
+        const submitBtn = document.getElementById('submitBtn');
 
-                            dropArea.addEventListener('click', () => input.click());
+        ticketForm.addEventListener('submit', function() {
+            submitBtn.disabled = true;
+            submitBtn.innerText = 'Sending Email & Saving...';
+            submitBtn.classList.add('opacity-50', 'cursor-wait');
+        });
 
-                            dropArea.addEventListener('drop', (e) => {
-                                const dt = e.dataTransfer;
-                                if (!dt) return;
-                                const files = Array.from(dt.files).filter(f => f.type.startsWith('image/'));
-                                if (!files.length) return;
-                                setFiles(files);
-                            });
+        // 2. Image Handling Logic
+        (function(){
+            const dropArea = document.getElementById('drop-area');
+            const input = document.getElementById('attachments-input');
+            const previews = document.getElementById('previews');
 
-                            input.addEventListener('change', () => {
-                                const files = Array.from(input.files || []).filter(f => f.type.startsWith('image/'));
-                                setFiles(files);
-                            });
+            function prevent(e){ e.preventDefault(); e.stopPropagation(); }
+            ['dragenter','dragover','dragleave','drop'].forEach(ev => dropArea.addEventListener(ev, prevent));
 
-                            function setFiles(files){
-                                // set input.files via DataTransfer
-                                const dt = new DataTransfer();
-                                files.forEach(f => dt.items.add(f));
-                                input.files = dt.files;
-                                renderPreviews(files);
-                            }
+            dropArea.addEventListener('click', () => input.click());
 
-                            function renderPreviews(files){
-                                previews.innerHTML = '';
-                                files.forEach((file, idx) => {
-                                    const reader = new FileReader();
-                                    const wrap = document.createElement('div');
-                                    wrap.className = 'relative border rounded overflow-hidden';
-                                    reader.onload = function(ev){
-                                        const img = document.createElement('img');
-                                        img.src = ev.target.result;
-                                        img.className = 'w-full h-24 object-cover';
-                                        wrap.appendChild(img);
-                                        const rem = document.createElement('button');
-                                        rem.type = 'button';
-                                        rem.className = 'absolute top-1 right-1 bg-black bg-opacity-50 text-white text-xs rounded px-1';
-                                        rem.textContent = '×';
-                                        rem.addEventListener('click', function(){ removeFileAt(idx); });
-                                        wrap.appendChild(rem);
-                                    };
-                                    reader.readAsDataURL(file);
-                                    previews.appendChild(wrap);
-                                });
-                            }
+            dropArea.addEventListener('drop', (e) => {
+                const files = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('image/'));
+                if (files.length) setFiles(files);
+            });
 
-                            function removeFileAt(index){
-                                const cur = Array.from(input.files || []);
-                                if (index < 0 || index >= cur.length) return;
-                                cur.splice(index, 1);
-                                const dt = new DataTransfer();
-                                cur.forEach(f => dt.items.add(f));
-                                input.files = dt.files;
-                                renderPreviews(Array.from(input.files));
-                            }
+            input.addEventListener('change', () => {
+                const files = Array.from(input.files).filter(f => f.type.startsWith('image/'));
+                setFiles(files);
+            });
 
-                            // If there are pre-selected files (rare), render them
-                            if (input.files && input.files.length) renderPreviews(Array.from(input.files));
-                        })();
-                        </script>
+            function setFiles(files){
+                const dt = new DataTransfer();
+                files.forEach(f => dt.items.add(f));
+                input.files = dt.files;
+                renderPreviews(files);
+            }
+
+            function renderPreviews(files){
+                previews.innerHTML = '';
+                files.forEach((file, idx) => {
+                    const reader = new FileReader();
+                    const wrap = document.createElement('div');
+                    wrap.className = 'relative border rounded';
+                    reader.onload = (ev) => {
+                        wrap.innerHTML = `<img src="${ev.target.result}" class="w-full h-24 object-cover rounded">`;
+                    };
+                    reader.readAsDataURL(file);
+                    previews.appendChild(wrap);
+                });
+            }
+        })();
+    </script>
 </body>
 </html>

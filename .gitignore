@@ -4,3 +4,4 @@ node_modules/
 vendor/
 composer.phar
 composer-setup.php
+includes/mail_config.php

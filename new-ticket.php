@@ -75,7 +75,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 ]);
 
                 $ticket_id = (int)$pdo->lastInsertId();
-                
+
+                // Send ticket copy to the client who created it
+                require_once __DIR__ . '/includes/mail.php';
+                $baseUrl = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off' ? 'https' : 'http') . '://' . ($_SERVER['HTTP_HOST'] ?? 'localhost') . rtrim(dirname($_SERVER['PHP_SELF'] ?? ''), '/');
+                $publicLink = $baseUrl . '/ticket-conversation.php?public_token=' . urlencode($public_token);
+                sendTicketCopyToClient($email, $full_name, $subject, $description, $ticket_id, $publicLink);
+
                 if (!empty($_FILES['attachments']) && is_array($_FILES['attachments']['name'])) {
                     $uploadDir = __DIR__ . '/uploads';
                     if (!is_dir($uploadDir)) {

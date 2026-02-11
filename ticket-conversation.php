@@ -40,6 +40,20 @@ if (
                 ':agent_id'  => $assignAgentIdInt,
                 ':ticket_id' => $assignTicketId,
             ]);
+
+            // Send email to the assigned agent
+            $agentRow = $pdo->prepare('SELECT name, email FROM Agents WHERE agent_id = :id LIMIT 1');
+            $agentRow->execute([':id' => $assignAgentIdInt]);
+            $agentInfo = $agentRow->fetch(PDO::FETCH_ASSOC);
+            $ticketRow = $pdo->prepare('SELECT subject FROM Tickets WHERE ticket_ID = :id LIMIT 1');
+            $ticketRow->execute([':id' => $assignTicketId]);
+            $ticketInfo = $ticketRow->fetch(PDO::FETCH_ASSOC);
+            if ($agentInfo && !empty($agentInfo['email']) && $ticketInfo) {
+                require_once __DIR__ . '/includes/mail.php';
+                $baseUrl = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off' ? 'https' : 'http') . '://' . ($_SERVER['HTTP_HOST'] ?? 'localhost') . rtrim(dirname($_SERVER['PHP_SELF'] ?? ''), '/');
+                $conversationUrl = $baseUrl . '/ticket-conversation.php?ticket_id=' . $assignTicketId;
+                sendAssignmentToAgent($agentInfo['email'], $agentInfo['name'], $assignTicketId, $ticketInfo['subject'], $conversationUrl);
+            }
         }
 
         header('Location: ticket-conversation.php?ticket_id=' . $assignTicketId);
@@ -103,6 +117,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
           $insc->execute([':t' => $tid, ':a' => $_SESSION['agent_id'], ':m' => $note]);
         }
         $pdo->commit();
+
+        // Send resolved confirmation to the client who created the ticket
+        $clientStmt = $pdo->prepare('SELECT c.email, c.full_name, t.subject, t.public_token FROM Tickets t INNER JOIN Clients c ON t.client_ID = c.client_ID WHERE t.ticket_ID = :id LIMIT 1');
+        $clientStmt->execute([':id' => $tid]);
+        $clientInfo = $clientStmt->fetch(PDO::FETCH_ASSOC);
+        if ($clientInfo && !empty($clientInfo['email'])) {
+            require_once __DIR__ . '/includes/mail.php';
+            $baseUrl = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off' ? 'https' : 'http') . '://' . ($_SERVER['HTTP_HOST'] ?? 'localhost') . rtrim(dirname($_SERVER['PHP_SELF'] ?? ''), '/');
+            $publicLink = $baseUrl . '/ticket-conversation.php?public_token=' . urlencode($clientInfo['public_token']);
+            sendResolvedConfirmationToClient($clientInfo['email'], $clientInfo['full_name'], $tid, $clientInfo['subject'], $publicLink);
+        }
       } catch (Exception $e) {
         $pdo->rollBack();
       }

@@ -88,7 +88,6 @@ $resolvedByMe = $resolvedStmt->fetchAll(PDO::FETCH_ASSOC);
                     <table class="min-w-full divide-y divide-gray-200">
                         <thead class="bg-gray-50">
                             <tr>
-                                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">#</th>
                                 <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Subject</th>
                                 <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Resolved</th>
                                 <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">View</th>
@@ -97,7 +96,6 @@ $resolvedByMe = $resolvedStmt->fetchAll(PDO::FETCH_ASSOC);
                         <tbody class="bg-white divide-y divide-gray-200">
                             <?php foreach ($resolvedByMe as $r): ?>
                                 <tr>
-                                    <td class="px-4 py-2 text-sm text-gray-700"><?php echo htmlspecialchars($r['ticket_ID']); ?></td>
                                     <td class="px-4 py-2 text-sm text-gray-900"><?php echo htmlspecialchars($r['subject']); ?></td>
                                     <td class="px-4 py-2 text-sm text-gray-600"><?php echo htmlspecialchars($r['resolved_at']); ?></td>
                                     <td class="px-4 py-2"><a href="ticket-conversation.php?ticket_id=<?php echo (int)$r['ticket_ID']; ?>" class="text-indigo-600 hover:underline text-sm">View</a></td>

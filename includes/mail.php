@@ -16,8 +16,8 @@ function getMailConfig() {
         'from_name'  => 'Ateneo HelpDesk',
         'smtp_host'  => 'smtp.gmail.com',
         'smtp_port'  => 587,
-        'smtp_username' => 'mict@adi.edu.ph',
-        'smtp_password' => 'ogjv ersu vvmu nove',
+        'smtp_username' => '',
+        'smtp_password' => '',
         'smtp_secure' => 'tls',
     ];
 }

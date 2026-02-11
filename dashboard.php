@@ -15,6 +15,7 @@
         <header class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
             <h1 class="text-3xl font-bold">Dashboard</h1>
             <p class="mt-2 text-sm text-gray-600">Manage tickets, view stats, and monitor activity.</p>
+            <a href="report.php" class="mt-4 inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700">Generate Report</a>
         </header>
 
         <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">

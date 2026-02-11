@@ -1,3 +1,6 @@
 /adieduph_helpdesk.sql
 /Ateneo Prom Backdrop.pdf
 node_modules/
+vendor/
+composer.phar
+composer-setup.php

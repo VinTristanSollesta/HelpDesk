@@ -1,0 +1,6 @@
+{
+    "name": "ateneo/helpdesk",
+    "require": {
+        "dompdf/dompdf": "^2.0"
+    }
+}

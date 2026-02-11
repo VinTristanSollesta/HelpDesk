@@ -42,26 +42,31 @@ if (
             ]);
         }
 
-        // Redirect back to the same ticket view
         header('Location: ticket-conversation.php?ticket_id=' . $assignTicketId);
         exit;
     }
 }
 
-// Handle posting a reply (agents only)
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($_POST['message'])) {
     if (session_status() !== PHP_SESSION_ACTIVE) session_start();
     $msg = trim($_POST['message']);
     $tid = (int)($_POST['ticket_id'] ?? 0);
     if (!empty($_SESSION['agent_id']) && $tid) {
-        $stmt = $pdo->prepare('INSERT INTO Comments (ticket_ID, author_ID, messages, created_at) VALUES (:t, :a, :m, NOW())');
-        $stmt->execute([':t' => $tid, ':a' => $_SESSION['agent_id'], ':m' => $msg]);
+        $tcheck = $pdo->prepare('SELECT agent_id, status_id FROM Tickets WHERE ticket_ID = :id LIMIT 1');
+        $tcheck->execute([':id' => $tid]);
+        $trow = $tcheck->fetch(PDO::FETCH_ASSOC);
+        $isAdmin = (int)($_SESSION['access_level'] ?? 0) === 1;
+        $isAssigned = $trow && (int)($trow['agent_id'] ?? 0) === (int)$_SESSION['agent_id'];
+        if ($trow && ($trow['status_id'] ?? 0) != 3 && ($isAdmin || $isAssigned)) {
+            $stmt = $pdo->prepare('INSERT INTO Comments (ticket_ID, author_ID, messages, created_at) VALUES (:t, :a, :m, NOW())');
+            $stmt->execute([':t' => $tid, ':a' => $_SESSION['agent_id'], ':m' => $msg]);
+        }
         header('Location: ticket-conversation.php?ticket_id=' . $tid);
         exit;
     }
 }
 
-// Handle resolving a ticket (agents only)
+// Handle resolving a ticket (assigned agent or admin only)
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'resolve') {
   if (session_status() !== PHP_SESSION_ACTIVE) session_start();
   if (empty($_SESSION['agent_id'])) {
@@ -69,7 +74,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
   } else {
     $tid = (int)($_POST['ticket_id'] ?? 0);
     if ($tid) {
-      $note = trim($_POST['resolution_note'] ?? '');
+      $tcheck = $pdo->prepare('SELECT agent_id, status_id FROM Tickets WHERE ticket_ID = :id LIMIT 1');
+      $tcheck->execute([':id' => $tid]);
+      $trow = $tcheck->fetch(PDO::FETCH_ASSOC);
+      $isAdmin = (int)($_SESSION['access_level'] ?? 0) === 1;
+      $isAssigned = $trow && (int)($trow['agent_id'] ?? 0) === (int)$_SESSION['agent_id'];
+      if (!$trow || ($trow['status_id'] ?? 0) == 3 || (!$isAdmin && !$isAssigned)) {
+        header('Location: ticket-conversation.php?ticket_id=' . $tid);
+        exit;
+      }
+      $note = trim($_POST['resolution_note'] ?? $_POST['message'] ?? '');
       try {
         $pdo->beginTransaction();
         $up = $pdo->prepare('UPDATE Tickets SET status_id = 3 WHERE ticket_ID = :t');
@@ -100,7 +114,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
 
 // Load tickets for left column (recent)
 // include status_id and basic metadata so UI can inspect ticket state when using the left list
-$ticketsStmt = $pdo->query("SELECT t.ticket_ID, t.status_id, t.created_at, t.client_ID, t.description, t.subject, t.public_token, c.full_name AS client_name, s.hexcolor AS hex_color, s.label AS status_label
+$ticketsStmt = $pdo->query("SELECT t.ticket_ID, t.status_id, t.agent_id, t.created_at, t.client_ID, t.description, t.subject, t.public_token, c.full_name AS client_name, s.hexcolor AS hex_color, s.label AS status_label
     FROM Tickets t
     LEFT JOIN Clients c ON t.client_ID = c.client_ID
     LEFT JOIN Status s ON t.status_id = s.status_id
@@ -283,7 +297,12 @@ function h($s){ return htmlspecialchars($s ?? '', ENT_QUOTES, 'UTF-8'); }
               ?>
             </div>
 
-            <?php if (!empty($_SESSION['agent_id']) && (($currentTicket['status_id'] ?? null) != 3)): ?>
+            <?php
+            $isAdmin = (int)($_SESSION['access_level'] ?? 0) === 1;
+            $isAssignedAgent = !empty($currentTicket['agent_id']) && (int)$currentTicket['agent_id'] === (int)$_SESSION['agent_id'];
+            $canReplyOrResolve = !empty($_SESSION['agent_id']) && (($currentTicket['status_id'] ?? null) != 3) && ($isAdmin || $isAssignedAgent);
+            ?>
+            <?php if ($canReplyOrResolve): ?>
               <form method="post" class="mt-2 flex items-end">
                 <input type="hidden" name="ticket_id" value="<?php echo h($currentTicket['ticket_ID']); ?>">
                 <div class="flex-1">
@@ -294,6 +313,8 @@ function h($s){ return htmlspecialchars($s ?? '', ENT_QUOTES, 'UTF-8'); }
                   <button type="submit" name="action" value="resolve" class="inline-flex items-center px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700">Resolve</button>
                 </div>
               </form>
+              <?php elseif (!empty($_SESSION['agent_id']) && (($currentTicket['status_id'] ?? null) != 3)): ?>
+              <p class="mt-2 text-sm text-gray-500">Only the assigned agent or an admin can reply or resolve this ticket.</p>
               <?php endif; ?>
 
           <?php endif; ?>
